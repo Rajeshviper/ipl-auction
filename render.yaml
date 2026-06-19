@@ -1,0 +1,33 @@
+# Render Blueprint - deploy both backend (Web Service) and frontend (Static Site)
+# Usage: push this repo to GitHub, then on Render.com choose "New > Blueprint" and point it here.
+
+services:
+  - type: web
+    name: ipl-auction-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install && npx prisma generate && npx prisma db push
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: CLIENT_ORIGIN
+        value: https://ipl-auction-client.onrender.com
+      - key: PORT
+        value: 4000
+
+  - type: web
+    name: ipl-auction-client
+    runtime: static
+    rootDir: client
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_SERVER_URL
+        value: https://ipl-auction-server.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

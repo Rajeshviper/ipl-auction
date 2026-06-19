@@ -1,0 +1,112 @@
+// IPL Live Auction - Database Schema
+// Using SQLite for zero-config deploy. Swap "provider" to "postgresql" for production scale.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A single Auction Room. The Host creates this and shares the roomCode link.
+model AuctionRoom {
+  id          String   @id @default(uuid())
+  roomCode    String   @unique // short code used in the shared join link, e.g. "AB12CD"
+  name        String   @default("IPL Live Auction")
+  status      String   @default("LOBBY") // LOBBY | LIVE | PAUSED | ENDED
+  currentPlayerId String?
+  timerSeconds    Int    @default(90) // current countdown value
+  timerStatus     String @default("STOPPED") // RUNNING | PAUSED | STOPPED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teams       Team[]
+  players     Player[]
+  bids        Bid[]
+  users       User[]
+}
+
+// A connected user/socket - could be Host, Buyer, or Participant
+model User {
+  id          String   @id @default(uuid())
+  name        String
+  role        String   // HOST | BUYER | PARTICIPANT
+  socketId    String?  // last known active socket id
+  isOnline    Boolean  @default(false)
+  joinedAt    DateTime @default(now())
+
+  roomId      String
+  room        AuctionRoom @relation(fields: [roomId], references: [id])
+
+  teamId      String?  @unique // a BUYER user is linked 1:1 with the team they own
+  team        Team?    @relation(fields: [teamId], references: [id])
+
+  @@index([roomId])
+}
+
+// A team owned by a Buyer (e.g. Mumbai Indians)
+model Team {
+  id            String   @id @default(uuid())
+  name          String   // "Mumbai Indians"
+  shortName     String   // "MI"
+  logoColor     String   @default("#1d4ed8") // hex color used for card theming since no image uploads required
+  totalPurse    Float    @default(10000) // in lakhs/credits, host configurable
+  remainingPurse Float   @default(10000)
+  createdAt     DateTime @default(now())
+
+  roomId        String
+  room          AuctionRoom @relation(fields: [roomId], references: [id])
+
+  owner         User?
+  players       Player[]
+  bids          Bid[]
+
+  @@index([roomId])
+  @@unique([roomId, shortName])
+}
+
+// A player up for auction
+model Player {
+  id           String   @id @default(uuid())
+  name         String
+  role         String   @default("Batsman") // Batsman | Bowler | All-Rounder | Wicketkeeper
+  country      String?
+  basePrice    Float    @default(20)
+  imageUrl     String?
+  status       String   @default("PENDING") // PENDING | LIVE | SOLD | UNSOLD
+  soldPrice    Float?
+  auctionOrder Int      @default(0) // controls the auction sequence
+  reauctionCount Int    @default(0) // how many times this player has been put back up
+  createdAt    DateTime @default(now())
+
+  roomId       String
+  room         AuctionRoom @relation(fields: [roomId], references: [id])
+
+  teamId       String?  // set once SOLD
+  team         Team?    @relation(fields: [teamId], references: [id])
+
+  bids         Bid[]
+
+  @@index([roomId])
+  @@index([status])
+}
+
+// Every bid placed, for history / audit / re-display
+model Bid {
+  id         String   @id @default(uuid())
+  amount     Float
+  createdAt  DateTime @default(now())
+
+  roomId     String
+  room       AuctionRoom @relation(fields: [roomId], references: [id])
+
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id])
+
+  teamId     String
+  team       Team     @relation(fields: [teamId], references: [id])
+
+  @@index([playerId])
+}

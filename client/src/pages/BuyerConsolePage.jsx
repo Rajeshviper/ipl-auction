@@ -1,3 +1,4 @@
+import SoldResultCard from "../components/SoldResultCard";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
@@ -24,7 +25,7 @@ function nextMinBid(currentAmount) {
 export default function BuyerConsolePage() {
   const navigate = useNavigate();
   const { socket } = useSocket();
-  const { room, session, lastEvent, timerSeconds } = useAuction();
+  const { room, session, lastEvent, auctionResult, timerSeconds } = useAuction();
   const { isVoiceOn, startVoice, stopVoice } = useVoiceChat(room?.id);
   const [tab, setTab] = useState("live");
   const [bidError, setBidError] = useState("");
@@ -95,14 +96,19 @@ export default function BuyerConsolePage() {
 
       {tab === "live" && (
         <div className="scroll-list">
+          {auctionResult ? (
+            <SoldResultCard result={auctionResult} />
+          ) : (
           <CurrentPlayerCard
-            player={room.currentPlayer}
-            highestBid={room.currentHighestBid}
-            timerSeconds={timerSeconds}
-            timerStatus={room.timerStatus}
+          player={room.currentPlayer}
+          highestBid={room.currentHighestBid}
+          timerSeconds={timerSeconds}
+          timerStatus={room.timerStatus}
           />
+          )}
 
-          {isTopBidder && (
+
+          {!auctionResult && isTopBidder && (
             <div className="card" style={{ marginTop: 12, textAlign: "center", background: "rgba(0,212,170,0.1)", border: "1px solid var(--accent-2)" }}>
               <span style={{ fontWeight: 700, color: "var(--accent-2)" }}>✅ You're the highest bidder!</span>
             </div>
@@ -112,7 +118,7 @@ export default function BuyerConsolePage() {
             <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10, textAlign: "center" }}>{bidError}</p>
           )}
 
-          {canBid && !isTopBidder && (
+          {!auctionResult && canBid && !isTopBidder && (
             <div style={{ marginTop: 16 }}>
               <p className="text-dim" style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>
                 TAP TO BID
@@ -142,13 +148,21 @@ export default function BuyerConsolePage() {
             </div>
           )}
 
-          {!canBid && (
+          {!auctionResult && !canBid && (
             <div className="card" style={{ marginTop: 12, textAlign: "center" }}>
               <p className="text-dim" style={{ fontSize: 13, margin: 0 }}>
                 {room.status === "PAUSED" ? "Auction is paused" : "Waiting for host to start..."}
               </p>
             </div>
           )}
+
+          {auctionResult && (
+            <div className="card" style={{ marginTop: 12, textAlign: "center" }}>
+              <p className="text-dim" style={{ fontSize: 13, margin: 0 }}>
+                Waiting for host to bring the next player...
+                </p>
+                </div>
+              )}
 
           <button
             className="btn-secondary"

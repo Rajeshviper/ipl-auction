@@ -167,34 +167,47 @@ async function finalizeCurrentPlayer(roomId) {
     include: { team: true },
   });
 
-  if (topBid) {
+  const finalizedPlayer = await prisma.Player.findUnique({ where: { id: room.currentPlayerId } });
+
+if (topBid) {
     await prisma.Player.update({
       where: { id: room.currentPlayerId },
       data: { status: "SOLD", soldPrice: topBid.amount, teamId: topBid.teamId },
     });
-    await prisma.Team.update({
+    const updatedTeam = await prisma.Team.update({
       where: { id: topBid.teamId },
       data: { remainingPurse: { decrement: topBid.amount } },
     });
 
     getIO().to(roomId).emit("player:sold", {
       playerId: room.currentPlayerId,
+      playerName: finalizedPlayer.name,
+      playerRole: finalizedPlayer.role,
       teamId: topBid.teamId,
       teamName: topBid.team.name,
+      teamShortName: topBid.team.shortName,
       amount: topBid.amount,
+      remainingPurse: updatedTeam.remainingPurse,
     });
   } else {
     await prisma.Player.update({
       where: { id: room.currentPlayerId },
       data: { status: "UNSOLD" },
     });
-    getIO().to(roomId).emit("player:unsold", { playerId: room.currentPlayerId });
+    getIO().to(roomId).emit("player:unsold", {
+      playerId: room.currentPlayerId,
+      playerName: finalizedPlayer.name,
+    });
   }
 
   await prisma.AuctionRoom.update({
     where: { id: roomId },
     data: { currentPlayerId: null, timerStatus: "STOPPED" },
   });
+
+  const updatedRoom = await getFullRoomState(roomId);
+  broadcastRoomState(roomId, updatedRoom);
+  return updatedRoom;
 }
 
 // A buyer places a bid. Validates: auction must be LIVE, amount must meet minimum,

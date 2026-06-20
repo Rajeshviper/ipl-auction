@@ -28,28 +28,44 @@ export function AuctionProvider({ children }) {
   const [room, setRoom] = useState(null);
   const [presence, setPresence] = useState([]);
   const [lastEvent, setLastEvent] = useState(null); // for toast-style notifications (sold/unsold/bid)
+  const [auctionResult, setAuctionResult] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(null);
 
   useEffect(() => {
     function onRoomState(updatedRoom) {
-      setRoom(updatedRoom);
+      const newPlayerId = updatedRoom.currentPlayer?.id || null;
+      setRoom((prevRoom) => {
+        const prevPlayerId = prevRoom?.currentPlayer?.id || null;
+        if (newPlayerId && newPlayerId !== prevPlayerId) {
+          setAuctionResult(null);
+        }
+        return updatedRoom;
+      });
       setTimerSeconds(updatedRoom.timerSeconds);
     }
+
     function onTick({ secondsLeft }) {
       setTimerSeconds(secondsLeft);
     }
+
     function onBidPlaced(payload) {
       setLastEvent({ type: "bid", ...payload, ts: Date.now() });
     }
+
     function onSold(payload) {
       setLastEvent({ type: "sold", ...payload, ts: Date.now() });
+      setAuctionResult({ type: "SOLD", ...payload, ts: Date.now() });
     }
+
     function onUnsold(payload) {
       setLastEvent({ type: "unsold", ...payload, ts: Date.now() });
+      setAuctionResult({ type: "UNSOLD", ...payload, ts: Date.now() });
     }
+
     function onPresence(list) {
       setPresence(list);
     }
+
     function onEnded() {
       setLastEvent({ type: "ended", ts: Date.now() });
     }
@@ -127,7 +143,7 @@ export function AuctionProvider({ children }) {
 
   return (
     <AuctionContext.Provider
-      value={{ session, room, presence, lastEvent, timerSeconds, joinRoom, leaveSession, setRoom }}
+      value={{ session, room, presence, lastEvent, auctionResult, timerSeconds, joinRoom, leaveSession, setRoom }}
     >
       {children}
     </AuctionContext.Provider>

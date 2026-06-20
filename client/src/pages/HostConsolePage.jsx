@@ -1,3 +1,4 @@
+import SoldResultCard from "../components/SoldResultCard";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
@@ -17,7 +18,7 @@ const TABS = [
 export default function HostConsolePage() {
   const navigate = useNavigate();
   const { socket } = useSocket();
-  const { room, session, lastEvent, timerSeconds } = useAuction();
+  const { room, session, lastEvent, auctionResult, timerSeconds } = useAuction();
   const { isVoiceOn, startVoice, stopVoice } = useVoiceChat(room?.id);
   const [tab, setTab] = useState("live");
   const [actionError, setActionError] = useState("");
@@ -65,12 +66,16 @@ export default function HostConsolePage() {
 
       {tab === "live" && (
         <div className="scroll-list">
-          <CurrentPlayerCard
-            player={room.currentPlayer}
-            highestBid={room.currentHighestBid}
-            timerSeconds={timerSeconds}
-            timerStatus={room.timerStatus}
-          />
+          {auctionResult ? (
+  <SoldResultCard result={auctionResult} />
+) : (
+  <CurrentPlayerCard
+    player={room.currentPlayer}
+    highestBid={room.currentHighestBid}
+    timerSeconds={timerSeconds}
+    timerStatus={room.timerStatus}
+  />
+)}
 
           <div className="card" style={{ marginTop: 12, textAlign: "center" }}>
             <div className="text-dim" style={{ fontSize: 12 }}>
@@ -89,7 +94,7 @@ export default function HostConsolePage() {
               </button>
             )}
 
-            {room.status === "LIVE" && room.currentPlayer && (
+            {!auctionResult && room.status === "LIVE" && room.currentPlayer && (
               <>
                 <button className="btn-secondary" onClick={() => emitAction("host:pauseAuction")}>
                   ⏸️ Pause Auction
@@ -100,11 +105,20 @@ export default function HostConsolePage() {
               </>
             )}
 
-            {room.status === "LIVE" && !room.currentPlayer && pendingCount > 0 && (
+            {!auctionResult && room.status === "LIVE" && !room.currentPlayer && pendingCount > 0 && (
               <button className="btn-primary" onClick={() => emitAction("host:nextPlayer")}>
                 ⏭️ Bring Next Player
               </button>
             )}
+
+            
+            {auctionResult && room.status === "LIVE" && (
+              <button className="btn-primary" onClick={() => emitAction("host:nextPlayer")}>
+                {pendingCount > 0 
+                ? "⏭️ Start Next Player Auction" 
+                : "🏁 No Players Left — End Auction"}
+                </button>
+              )}
 
             {room.status === "PAUSED" && (
               <button className="btn-primary" onClick={() => emitAction("host:resumeAuction")}>
@@ -156,19 +170,29 @@ export default function HostConsolePage() {
       {tab === "sold" && (
         <div className="scroll-list">
           {soldPlayers.length === 0 && <p className="text-dim" style={{ textAlign: "center", marginTop: 30 }}>No players sold yet</p>}
-          {soldPlayers.map((p) => (
-            <div key={p.id} className="card row" style={{ marginBottom: 8 }}>
-              <span>
-                <div style={{ fontWeight: 700 }}>{p.name}</div>
-                <div className="text-dim" style={{ fontSize: 12 }}>{p.role}</div>
-              </span>
-              <span style={{ textAlign: "right" }}>
-                <div style={{ fontWeight: 800, color: "var(--accent-2)" }}>₹{p.soldPrice}L</div>
-              </span>
-            </div>
-          ))}
+          {soldPlayers.map((p) => {
+  const team = room.teams.find((t) => t.id === p.teamId);
+
+  return (
+    <div key={p.id} className="card row" style={{ marginBottom: 8 }}>
+      <span>
+        <div style={{ fontWeight: 700 }}>{p.name}</div>
+        <div className="text-dim" style={{ fontSize: 12 }}>
+          {p.role} · Sold to {team ? team.name : "—"}
         </div>
+      </span>
+
+      <span style={{ textAlign: "right" }}>
+        <div style={{ fontWeight: 800, color: "var(--accent-2)" }}>
+          ₹{p.soldPrice}L
+        </div>
+      </span>
+    </div>
+  );
+})}
+</div>
       )}
+
 
       {tab === "unsold" && (
         <div className="scroll-list">

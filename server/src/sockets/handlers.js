@@ -93,12 +93,9 @@ function registerSocketHandlers(io) {
     });
 
     socket.on("host:markUnsold", async ({ roomId }, cb) => {
-      // Host can force-mark current player UNSOLD immediately (skip timer)
       if (!(await isHost(socket))) return cb?.({ ok: false, error: "Only host can do this." });
       engine.stopTimer(roomId);
-      await engine.finalizeCurrentPlayer(roomId);
-      const room = await engine.getFullRoomState(roomId);
-      io.to(roomId).emit("room:state", room);
+      const room = await engine.finalizeCurrentPlayer(roomId);
       cb?.({ ok: true, room });
     });
 

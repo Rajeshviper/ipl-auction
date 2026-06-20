@@ -1,3 +1,4 @@
+import SoldResultCard from "../components/SoldResultCard";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuction } from "../context/AuctionContext";
@@ -14,7 +15,7 @@ const TABS = [
 
 export default function ParticipantWatchPage() {
   const navigate = useNavigate();
-  const { room, session, lastEvent, timerSeconds } = useAuction();
+  const { room, session, lastEvent, auctionResult, timerSeconds } = useAuction();
   const { isVoiceOn, startVoice, stopVoice } = useVoiceChat(room?.id);
   const [tab, setTab] = useState("live");
   const [voiceError, setVoiceError] = useState("");
@@ -51,12 +52,17 @@ export default function ParticipantWatchPage() {
 
       {tab === "live" && (
         <div className="scroll-list">
+          {auctionResult ? (
+            <SoldResultCard result={auctionResult} />
+          ) : (
           <CurrentPlayerCard
-            player={room.currentPlayer}
-            highestBid={room.currentHighestBid}
-            timerSeconds={timerSeconds}
-            timerStatus={room.timerStatus}
+          player={room.currentPlayer}
+          highestBid={room.currentHighestBid}
+          timerSeconds={timerSeconds}
+          timerStatus={room.timerStatus}
           />
+          )}
+          
           {voiceError && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10, textAlign: "center" }}>{voiceError}</p>}
           <button
             className="btn-secondary"

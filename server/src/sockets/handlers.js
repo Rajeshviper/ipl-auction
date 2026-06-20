@@ -92,10 +92,15 @@ function registerSocketHandlers(io) {
       cb?.({ ok: true, room });
     });
 
+    socket.on("host:markSold", async ({ roomId }, cb) => {
+      if (!(await isHost(socket))) return cb?.({ ok: false, error: "Only host can do this." });
+      const result = await engine.forceMarkSold(roomId);
+      cb?.(result);
+    });
+    
     socket.on("host:markUnsold", async ({ roomId }, cb) => {
       if (!(await isHost(socket))) return cb?.({ ok: false, error: "Only host can do this." });
-      engine.stopTimer(roomId);
-      const room = await engine.finalizeCurrentPlayer(roomId);
+      const room = await engine.forceMarkUnsold(roomId);
       cb?.({ ok: true, room });
     });
 

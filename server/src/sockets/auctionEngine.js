@@ -156,6 +156,86 @@ async function moveToNextPlayer(roomId) {
   return room;
 }
 
+// Host explicitly skips the current player as UNSOLD, even if there's an active bid.
+async function forceMarkUnsold(roomId) {
+  const room = await prisma.AuctionRoom.findUnique({ where: { id: roomId } });
+  if (!room || !room.currentPlayerId) return null;
+
+  stopTimer(roomId);
+
+  const finalizedPlayer = await prisma.Player.findUnique({ where: { id: room.currentPlayerId } });
+
+  await prisma.Player.update({
+    where: { id: room.currentPlayerId },
+    data: { status: "UNSOLD" },
+  });
+
+  getIO().to(roomId).emit("player:unsold", {
+    playerId: room.currentPlayerId,
+    playerName: finalizedPlayer.name,
+  });
+
+  await prisma.AuctionRoom.update({
+    where: { id: roomId },
+    data: { currentPlayerId: null, timerStatus: "STOPPED" },
+  });
+
+  const updatedRoom = await getFullRoomState(roomId);
+  broadcastRoomState(roomId, updatedRoom);
+  return updatedRoom;
+}
+
+// Host explicitly sells the current player to whoever is currently the highest bidder.
+async function forceMarkSold(roomId) {
+  const room = await prisma.AuctionRoom.findUnique({ where: { id: roomId } });
+  if (!room || !room.currentPlayerId) {
+    return { ok: false, error: "No player is currently live." };
+  }
+
+  const topBid = await prisma.Bid.findFirst({
+    where: { playerId: room.currentPlayerId },
+    orderBy: { amount: "desc" },
+    include: { team: true },
+  });
+
+  if (!topBid) {
+    return { ok: false, error: "No bids yet — cannot mark sold. Use Mark Unsold instead." };
+  }
+
+  stopTimer(roomId);
+
+  const finalizedPlayer = await prisma.Player.findUnique({ where: { id: room.currentPlayerId } });
+
+  await prisma.Player.update({
+    where: { id: room.currentPlayerId },
+    data: { status: "SOLD", soldPrice: topBid.amount, teamId: topBid.teamId },
+  });
+  const updatedTeam = await prisma.Team.update({
+    where: { id: topBid.teamId },
+    data: { remainingPurse: { decrement: topBid.amount } },
+  });
+
+  getIO().to(roomId).emit("player:sold", {
+    playerId: room.currentPlayerId,
+    playerName: finalizedPlayer.name,
+    playerRole: finalizedPlayer.role,
+    teamId: topBid.teamId,
+    teamName: topBid.team.name,
+    teamShortName: topBid.team.shortName,
+    amount: topBid.amount,
+    remainingPurse: updatedTeam.remainingPurse,
+  });
+
+  await prisma.AuctionRoom.update({
+    where: { id: roomId },
+    data: { currentPlayerId: null, timerStatus: "STOPPED" },
+  });
+
+  const updatedRoom = await getFullRoomState(roomId);
+  broadcastRoomState(roomId, updatedRoom);
+  return { ok: true, room: updatedRoom };
+}
+
 // Called when timer hits zero: decides SOLD vs UNSOLD based on highest bid.
 async function finalizeCurrentPlayer(roomId) {
   const room = await prisma.AuctionRoom.findUnique({ where: { id: roomId } });
@@ -306,6 +386,8 @@ module.exports = {
   getFullRoomState,
   moveToNextPlayer,
   finalizeCurrentPlayer,
+  forceMarkSold,
+  forceMarkUnsold,
   placeBid,
   reauctionPlayer,
   pauseAuction,

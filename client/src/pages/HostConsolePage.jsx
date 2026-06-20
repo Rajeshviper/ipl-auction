@@ -99,6 +99,17 @@ export default function HostConsolePage() {
                 <button className="btn-secondary" onClick={() => emitAction("host:pauseAuction")}>
                   ⏸️ Pause Auction
                 </button>
+
+                {room.currentHighestBid && (
+                  <button
+                  className="btn-primary"
+                  style={{ background: "linear-gradient(135deg, var(--accent-2), #00b894)", boxShadow: "0 6px 18px rgba(0,212,170,0.35)" }}
+                  onClick={() => emitAction("host:markSold")}
+                  >
+                    ✅ Sell Now to {room.currentHighestBid.teamShortName} — ₹{room.currentHighestBid.amount}L
+                    </button>
+                  )}
+                  
                 <button className="btn-danger" onClick={() => emitAction("host:markUnsold")}>
                   ❌ Mark Unsold Now
                 </button>
